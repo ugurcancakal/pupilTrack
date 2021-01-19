@@ -4,8 +4,6 @@ Unit test file
 
 Author : Ugurcan Cakal
 
-Effort Log
-2101091813 2 hours problem exploration
 '''
 
 import os
@@ -23,6 +21,7 @@ test_files = os.path.join(os.getcwd(), 'test_files')
 data_dir = os.path.dirname(os.path.dirname(os.getcwd()))
 data_dir = os.path.join(data_dir, 'data')
 eye_rec = 'eye_recording.flv'
+eye_rec2 = 'eye_recording2.flv'
 eye_frame = 'region.png'
 eye_frame2 = 'eye.png'
 
@@ -194,6 +193,22 @@ class EyeTrack(unittest.TestCase):
     #             key = cv2.waitKey(0)
 
     #     eye.save_video(np.asarray(frame_list))
+
+    # def test_initial_region_estimation(self):
+
+    #     filepath = os.path.join(test_files, eye_frame2)
+    #     frame = cv2.imread(filepath)
+    #     region = eye.initial_region_estimation(eye.to_gray(frame), radius=32, step=4, h_factor=1.5)
+    #     roi = eye.clip_rect(eye.to_gray(frame), region)       
+    #     pupil = eye.pupil_segmentation(roi)
+    #     segment = eye.overlay_pupil(frame,pupil, offset=region[0])
+    #     # cv2.imshow("FRAME", roi)
+    #     cv2.imshow("SEGMENT", segment)
+    #     key = cv2.waitKey(0)
+
+    def test_main(self):
+        filepath = os.path.join(test_files, eye_rec2)
+        eye.main(filepath)
         
 def sorted_alphanumeric(data):
     convert = lambda text: int(text) if text.isdigit() else text.lower()
