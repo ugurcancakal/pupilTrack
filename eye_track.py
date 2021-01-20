@@ -7,6 +7,8 @@ Author : Ugurcan Cakal
 
 import sys
 import cv2
+import time
+import progressbar
 
 import numpy as np
 import random as rng
@@ -688,23 +690,97 @@ def save_video(frame_seq,filepath='test.avi',fps=24):
 				frame per second
 
 	'''
-
+	tic = time.perf_counter()
 	fourcc = VideoWriter_fourcc(*'MP42')
-
 	frame_shape = frame_seq[0].shape
-
 	video = VideoWriter(filepath, fourcc, float(fps), (frame_shape[1], frame_shape[0]))  
 
-	for frame in frame_seq:
+	print(f"{filepath} saving...")
+	widgets=[progressbar.Bar('=', '[', ']'), ' ', progressbar.Percentage()]
+	bar = progressbar.ProgressBar(maxval=len(frame_seq), widgets = widgets).start()
+
+	for i, frame in enumerate(frame_seq):
 		video.write(frame)
+		bar.update(i)
 	video.release()
+	bar.finish()
+
+	toc = time.perf_counter()
+	print(f"{filepath} saved in {toc-tic:0.4f} seconds!\n")
 
 # ------------------------------- # 
 
 
 # ----------- Main ----------- # 
 
-def main(filepath):
+def process_image(in_file):
+	frame = cv2.imread(in_file)
+	frame = pupil_on_frame(frame)
+	return frame
+
+def pupil_on_frame(frame):
+	'''
+	Process single image and overlay pupil
+	'''
+	# STEP 1 : Convert the frames to the grayscale version
+	gray_roi = to_gray(frame)
+
+	# STEP 2 : Approximate the pupil region to reduce the search space
+	region = initial_region_estimation(gray_roi,radius=32, step=4, h_factor=1.5)
+	roi = clip_rect(gray_roi, region)   
+
+	# STEP 4: Pupil Segmentation
+	pupil = pupil_segmentation(roi)
+	if pupil is not None:
+		frame = overlay_pupil(frame, pupil, offset=region[0])
+	return frame
+
+def process_video(in_file, percentage=1.0):
+	'''
+	Process a video and overlay pupil
+	'''
+	# Init
+	i = 0
+	tic = time.perf_counter()
+	video = cv2.VideoCapture(in_file)
+	fps = video.get(cv2.CAP_PROP_FPS)
+	frame_count = video.get(cv2.CAP_PROP_FRAME_COUNT)
+	video_pupil = [None]*int(frame_count*percentage)
+	
+	# Iterate through the frames in the video
+	print(f"{in_file} processing...")
+	widgets=[progressbar.Bar('=', '[', ']'), ' ', progressbar.Percentage()]
+	bar = progressbar.ProgressBar(maxval=int(frame_count), widgets = widgets).start()
+
+	for i,frame in enumerate(video_pupil):
+		ret, frame = video.read()
+		if not ret:
+			break
+		video_pupil[i] = pupil_on_frame(frame)
+		bar.update(i)
+
+	bar.finish()
+	toc = time.perf_counter()
+	print(f"{in_file} processed in {toc-tic:0.4f} seconds!\n")
+
+	return video_pupil, fps
+
+def main(mode, in_file, out_file, percentage=1.0):
+	'''
+	'''
+	if mode == 'image':
+		image_pupil = process_image(in_file)
+		cv2.imwrite(out_file, image_pupil)
+
+	elif mode == 'video':
+		video_pupil, fps = process_video(in_file, percentage)
+		save_video(video_pupil, out_file, fps)
+
+	else:
+		info = 'Unsupported mode of operation!\n'
+		info += 'Refer to user manual by eye_track -h'
+		raise ValueError(info)
+
 	'''
 	# Main operation
 	# '''
@@ -739,37 +815,99 @@ def main(filepath):
 	# cv2.destroyAllWindows()
 
 
-	cap = cv2.VideoCapture('rec2.avi')
+	# cap = cv2.VideoCapture('rec2.avi')
 
-	while(cap.isOpened()):
-		ret, frame = cap.read()
+	# while(cap.isOpened()):
+	# 	ret, frame = cap.read()
 
-		# cv2.imshow('frame',frame)
+	# 	# cv2.imshow('frame',frame)
 
-		# STEP 2 : Convert the frames to the grayscale version
-		gray_roi = to_gray(frame)
+		# # STEP 2 : Convert the frames to the grayscale version
+		# gray_roi = to_gray(frame)
 
-		# STEP 3 : Approximate the pupil region to reduce the search space
-		region = initial_region_estimation(gray_roi,radius=36, step=8, h_factor=1.5)
-		roi = clip_rect(gray_roi, region)   
+		# # STEP 3 : Approximate the pupil region to reduce the search space
+		# region = initial_region_estimation(gray_roi,radius=36, step=8, h_factor=1.5)
+		# roi = clip_rect(gray_roi, region)   
 
-		# STEP 4: Pupil Segmentation
-		pupil = pupil_segmentation(roi)
-		if pupil is not None:
-			segment = overlay_pupil(frame, pupil, offset=region[0])
+		# # STEP 4: Pupil Segmentation
+		# pupil = pupil_segmentation(roi)
+		# if pupil is not None:
+		# 	segment = overlay_pupil(frame, pupil, offset=region[0])
 
-			cv2.imshow("REGION", segment)
+	# 		cv2.imshow("REGION", segment)
 
-		if cv2.waitKey(1) & 0xFF == ord('q'):
-			break
+	# 	if cv2.waitKey(1) & 0xFF == ord('q'):
+	# 		break
 
-	# cap.release()
-	cv2.destroyAllWindows()
+	# # cap.release()
+	# cv2.destroyAllWindows()
 # ---------------------------- # 
+
+def parse_argv(argv):
+	'''
+	Parse the argument vector
+	Example 
+	python3 eye_track.py -m video -i eye_recording.flv -o eye_rec_pupil.avi
+
+		Arguments:
+			argv(list of str):
+				command line arguments passed to the main function
+
+		Returns:
+			mode(str):
+				operating mode of the system
+
+			in_file(str):
+				input filepath
+
+			out_file(str):
+				output filepath
+
+	'''	
+	mode, in_file, out_file, percentage = None, None, None, 1.0
+
+	for i,arg in enumerate(argv[1:],1):
+		# Output
+		if arg ==  '-h':
+			print(user_manual())
+		# Mode
+		if arg ==  '-m':
+			mode = argv[i+1]
+		# Input
+		if arg ==  '-i':
+			in_file = argv[i+1]
+		# Output
+		if arg ==  '-o':
+			out_file = argv[i+1]
+		# Percentage
+		if arg ==  '-p':
+			percentage = float(argv[i+1])
+
+	return mode, in_file, out_file, percentage
+
+def user_manual():
+	'''
+	User manual as a string
+		Returns:
+			info(str):
+				user manual
+	'''
+	info = "\n\n # ------- Eye Tracker User Manual ------- # \n\n"
+	info += "Command Line Arguments:\n\n"
+	info += "-m <operation mode>\n"
+	info += "i.e. image/video\n\n"
+	info += "-i <input file>\n"
+	info += "i.e. eye_rec.avi\n\n"
+	info += "-o <output file>\n"
+	info += "i.e. eye_rec_pupil.avi\n\n"
+
+	return info
 
 if __name__ == '__main__':
 
 	if len(sys.argv)>1:
-		main(sys.argv[1], params)
-	
+		mode, in_file, out_file, percentage = parse_argv(sys.argv)
+		if mode is not None:
+			main(mode, in_file, out_file, percentage)
 
+	# print(sys.argv)
