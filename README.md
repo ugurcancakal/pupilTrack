@@ -2,6 +2,18 @@
 
 Implementation of a system that tracks the pupil and the iris of a human eye. System will analyze a video feed and highlight centers and perimeters of the pupil and the iris.
 
+Find the pupil and iris on frame and overlay
+
+* STEP 1 : Detect the region of interest for iris and pupil
+* STEP 2 : Find adaptive iris and pupil thresholds
+* STEP 3 : Find exact locations of the iris and the pupil
+* STEP 4 : Check Iris and Pupil
+* STEP 5 : Record the status
+* STEP 6 : Overlay rectangles, iris, and pupil
+
+Full Pipeline:
+
+![Pipeline](https://github.com/ugurcancakal/pupilTrack/blob/main/test_output/pipeline.png)
 
 ## Environment:
 
