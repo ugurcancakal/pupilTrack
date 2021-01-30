@@ -1692,7 +1692,7 @@ def main(mode, in_file, out_file, percentage=1.0):
 		cv2.imwrite(out_file, image_pupil)
 
 	elif mode == 'video':
-		pof = PupirisOnFrame(update_limit=(1,4), radius_range=(16,64), r_step=4, xy_step=8, np_clusters=2, ni_clusters=3, h_factor=1.2, iris=True)
+		pof = PupirisOnFrame(update_limit=(1,8), radius_range=(48,64), r_step=4, xy_step=8, np_clusters=2, ni_clusters=3, h_factor=1.2, iris=True)
 		video_pupil, fps = process_video(in_file, pof, percentage)
 		save_video(video_pupil, out_file, fps)
 
